@@ -1,14 +1,14 @@
 import asyncio
 from calendar import month
-from dataclasses import dataclass, field
-from typing import Annotated, Literal, Dict
+from dataclasses import dataclass
+from typing import Annotated, Literal
 import json
 import argparse
 from fastmcp import FastMCP
 import requests
 import logging
 from geopy.geocoders import Nominatim
-from sportsclasses import SupportedSports, Sport, get_supported_sports_string, sports
+from sportsclasses import SportResource, SupportedSports, Sport, get_supported_sports_string, sports
 from pydantic import Field
 import time
 
@@ -21,6 +21,11 @@ mcp = FastMCP("sports")
 
 '''
     SPORTSRADAR API CONSTANTS
+    
+    Note: if you want to add a sport:
+    - in sportsclasses.py update `sports`
+    - add the parsing in resources
+    - add links in tools
 '''
 
 mcp.sports = sports
@@ -73,13 +78,7 @@ mcp.config = SportRadarConfig()
 
 @mcp.resource("sports://seasonsched/{_cache}")
 @dataclass
-class SeasonSchedule:
-    _cache: dict = field(default_factory=dict)
-    
-    async def get(self, _cache: str) -> dict:
-        if _cache in self._cache:
-            return self._cache[_cache]
-        return {}
+class SeasonSchedule(SportResource):
     
     def parse_schedule(self, data: dict, sport: SupportedSports) -> dict:
         '''
@@ -108,13 +107,7 @@ mcp.season_schedule = SeasonSchedule()
 
 @mcp.resource("sports://leaguetransactions/{_cache}")
 @dataclass
-class LeagueTransactions:
-    _cache: dict = field(default_factory=dict)
-    
-    async def get(self, _cache: str) -> dict:
-        if _cache in self._cache:
-            return self._cache[_cache]
-        return {}
+class LeagueTransactions(SportResource):
     
     def parse_transactions(self, data: dict, sport: SupportedSports) -> dict:
         '''
@@ -174,13 +167,7 @@ mcp.league_transactions = LeagueTransactions()
 
 @mcp.resource("sports://gamestats/{_cache}")
 @dataclass
-class GameStats:
-    _cache: dict = field(default_factory=dict)
-    
-    async def get(self, _cache: str) -> dict:
-        if _cache in self._cache:
-            return self._cache[_cache]
-        return {}
+class GameStats(SportResource):
     
     def parse_stats(self, data: dict, sport: SupportedSports) -> dict:
         '''
@@ -210,13 +197,7 @@ mcp.game_stats = GameStats()
 
 @mcp.resource("sports://leaguestats/{_cache}")
 @dataclass
-class LeagueStats:
-    _cache: dict = field(default_factory=dict)
-    
-    async def get(self, _cache: str) -> dict:
-        if _cache in self._cache:
-            return self._cache[_cache]
-        return {}
+class LeagueStats(SportResource):
     
     def parse_stats(self, data: dict, sport: SupportedSports) -> dict:
         '''
@@ -245,13 +226,7 @@ mcp.league_stats = LeagueStats()
 
 @mcp.resource("sports://teamstats/{_cache}")
 @dataclass
-class TeamStats:
-    _cache: dict = field(default_factory=dict)
-    
-    async def get(self, _cache: str) -> dict:
-        if _cache in self._cache:
-            return self._cache[_cache]
-        return {}
+class TeamStats(SportResource):
     
     def parse_stats(self, data: dict, sport: SupportedSports) -> dict:
         '''
@@ -279,15 +254,9 @@ class TeamStats:
     
 mcp.team_stats = TeamStats()
 
-@mcp.resource("sports://teamstats/{_cache}")
+@mcp.resource("sports://playerstats/{_cache}")
 @dataclass
-class PlayerStats:
-    _cache: dict = field(default_factory=dict)
-    
-    async def get(self, _cache: str) -> dict:
-        if _cache in self._cache:
-            return self._cache[_cache]
-        return {}
+class PlayerStats(SportResource):
     
     def parse_stats(self, data: dict, sport: SupportedSports) -> dict:
         '''
@@ -316,7 +285,10 @@ mcp.player_stats = PlayerStats()
 
 '''
     TOOLS
+
+    Note: most Annotated fields are configured for the NFL, might want to update them if adding a sport
 '''
+
 @mcp.tool()
 async def update_api_config(language: str | None = None,
                             access_level: str | None = None,
@@ -379,7 +351,7 @@ async def get_daily_transactions(year: int,
         return f'Error getting transactions: {str(e)}'
 
 @mcp.tool()
-async def get_game_stats(game_id: str, 
+async def get_game_stats(game_id: Annotated[str, Field(description="ID for the game to get stats for. If unknown, get schedule first")], 
                          sport: Annotated[str, Field(description=f"Sport to get game stats for. Supported vals: {get_supported_sports_string()}")] = "nfl") -> str:
     '''Gets statistical info on a specific sports game using it's ID
     Args:
@@ -411,7 +383,7 @@ async def get_league_info(sport: Annotated[str, Field(description=f"Sport to get
         return f'Error getting league info: {str(e)}'
 
 @mcp.tool()
-async def get_team_roster(team_id: str = None, 
+async def get_team_roster(team_id: Annotated[str, Field(description="Team to get roster info for. If unknown, get league info")], 
                           sport: Annotated[str, Field(description=f"Sport to get league info for. Supported vals: {get_supported_sports_string()}")] = "nfl") -> str:
     '''Gets franchise team info + complete roster of players in the sport provided
     Args:
@@ -443,7 +415,7 @@ async def get_tournament_list(year: int,
         logger.error(f'Error getting tournament info: {str(e)}')
         return f'Error getting tournament info: {str(e)}'
     
-async def get_tournament_info(tournament_id: str = None, 
+async def get_tournament_info(tournament_id: Annotated[str, Field(description="ID of tournament. If unknown, get tournament list")], 
                               sport: Annotated[str, Field(description=f"Sport to get league info for. Supported vals: {get_supported_sports_string()}")] = "nfl") -> str:
     '''Gets information of a tournament that is happening for the sport
     Args:
@@ -459,7 +431,7 @@ async def get_tournament_info(tournament_id: str = None,
         return f'Error getting tournament info: {str(e)}'
 
 @mcp.tool()
-async def get_player_stats(player_id: str,
+async def get_player_stats(player_id: Annotated[str, Field(description="ID of player for info. If unknown, get team roster")],
                            sport: Annotated[str, Field(description=f"Sport to get player info for. Supported vals: {get_supported_sports_string()}")] = "nfl") -> str:
     '''Gets top-level info about each player in the sport provided
     Args:

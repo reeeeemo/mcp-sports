@@ -1,5 +1,5 @@
 from enum import Enum
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Dict
 
 class SupportedSports(str, Enum):
@@ -21,7 +21,18 @@ class Sport:
         self.ver = api_ver
         self.official = official
         
+@dataclass
+class SportResource:
+    _cache: dict = field(default_factory=dict) 
+    
+    async def get(self, _cache: str) -> dict:
+        if _cache in self._cache:
+             return self._cache[_cache]
+        return {}
+    
+        
 # API versions, since there is no dynamic way to call this :,)
 sports: Dict[SupportedSports, Sport] = {
     SupportedSports.NFL: Sport(SupportedSports.NFL, ["br", "da", "de", "en", "es", "fi", "fr", "it", "ja", "nl", "no", "se", "tr"], "v7", official=True)
 }
+
