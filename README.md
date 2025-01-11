@@ -4,12 +4,8 @@
 
 <strong>Python implementation of the Model Context Protocol (MCP)</strong>
 
-[![PyPI][pypi-badge]][pypi-url]
 [![MIT licensed][mit-badge]][mit-url]
 [![Python Version][python-badge]][python-url]
-[![Documentation][docs-badge]][docs-url]
-[![Specification][spec-badge]][spec-url]
-[![GitHub Discussions][discussions-badge]][discussions-url]
 
 </div>
 
