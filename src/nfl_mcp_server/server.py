@@ -10,6 +10,7 @@ import logging
 from geopy.geocoders import Nominatim
 from sportsclasses import SupportedSports, Sport, get_supported_sports_string, sports
 from pydantic import Field
+import time
 
 # Logging config
 logging.basicConfig(level=logging.INFO)
@@ -23,7 +24,8 @@ mcp = FastMCP("sports")
 '''
 
 mcp.sports = sports
-        
+       
+
 @dataclass
 class SportRadarConfig:
     format: Literal["json", "xml"] = "json"
@@ -49,6 +51,7 @@ class SportRadarConfig:
         logger.info(f'API_KEY: {params}')
         
         response = requests.get(final_url, params=params, headers=headers)
+        time.sleep(1) # no too many request errors
         logger.info(f'Response Status Code {response.status_code}')
         
         if not response.ok:
@@ -94,49 +97,12 @@ class SeasonSchedule:
         return parser(data)
         
     def parse_football_schedule(self, data: dict) -> dict:
-        sched_id = data.get('season').get('id')
+        sched_id = data.get('id')
         if sched_id in self._cache:
             return self._cache[sched_id]
-
-        weeks = []
         
-        season = {
-            'id': data.get('season').get('id'),
-            'year': data.get('season').get('year'),
-            'weeks': weeks
-        }
-        
-        for week in data.get('weeks', []):
-            games = []
-            if week.get('games'):
-                for game in week.get('games'):
-                    venue = game.get('venue', {})
-                    location = venue.get('location', {})
-                    
-                    temp_game = {
-                        'id': game.get('id'),
-                        'date': game.get('scheduled'),
-                        'location': {
-                            'lat': location.get('lat'),
-                            'lng': location.get('lng')
-                        },
-                        'stadium': venue.get('name'),
-                        'home_team': game.get('home', {}).get('name'),
-                        'away_team': game.get('away', {}).get('name'),
-                        'score_home': game.get('scoring', {}).get('home_points'),
-                        'score_away': game.get('scoring', {}).get('away_points')
-                    }
-                    games.append(temp_game)
-
-                temp_week = {
-                    'id': week.get('id'),
-                    'num': week.get('sequence'),
-                    'games': games
-                }
-                weeks.append(temp_week)
-        
-        self._cache[sched_id] = season
-        return season
+        self._cache[sched_id] = data
+        return data
     
 mcp.season_schedule = SeasonSchedule()
 
@@ -310,7 +276,43 @@ class TeamStats:
         self._cache[stats_id] = data
         return data
     
+    
 mcp.team_stats = TeamStats()
+
+@mcp.resource("sports://teamstats/{_cache}")
+@dataclass
+class PlayerStats:
+    _cache: dict = field(default_factory=dict)
+    
+    async def get(self, _cache: str) -> dict:
+        if _cache in self._cache:
+            return self._cache[_cache]
+        return {}
+    
+    def parse_stats(self, data: dict, sport: SupportedSports) -> dict:
+        '''
+            When given a list of player stats from a sport to parse, give the correct parser to the correct sport
+        '''
+        parser_map = {
+            SupportedSports.NFL: self.parse_nfl_stats,    
+        }
+        
+        parser = parser_map.get(sport)
+        if not parser:
+            logger.error(f"No parser implemented for sport {sport}")
+            raise ValueError(f"No parser implemented for sport: {sport}")
+        
+        return parser(data)
+    
+    def parse_nfl_stats(self, data: dict) -> dict:
+        stats_id = data.get('id')
+        if stats_id in self._cache:
+            return self._cache[stats_id]
+        
+        self._cache[stats_id] = data
+        return data
+
+mcp.player_stats = PlayerStats()
 
 '''
     TOOLS
@@ -333,21 +335,24 @@ async def update_api_config(language: str | None = None,
     Access Level: {mcp.config.access_level}
     Base URL (updated): {mcp.config.get_base_url(SupportedSports.NFL)}"""
 
+
 @mcp.tool()
-async def get_season_schedule(week: Annotated[int, Field(description="Week schedule for sport. 1 (NO 0 WEEK) (September) - 18 (January) weeks for the season. 5 Playoff weeks after.)")] = 0, 
-                              sport: Annotated[str, Field(description=f"Sport to get schedule for. Supported vals: {get_supported_sports_string()}")] = "nfl") -> str:
-    '''Gets current schedule for the sport given. 
+async def get_schedule(week: Annotated[int, Field(description="Week schedule for sport. 1 (NO 0 WEEK) (September) - 18 (January) weeks for the season. Playoff resets to 1-4 weeks.)")] = 0,
+                       type: Annotated[str, Field(description="Type of season, PRE (pre season), REG (regular season), PST (post season)")] = "REG",
+                       year: Annotated[int, Field(description="Year of season")] = 2024,
+                       sport: Annotated[str, Field(description=f"Sport to get schedule for. Supported vals: {get_supported_sports_string()}")] = "nfl") -> str:
+    '''Gets a week schedule for the sport given. 
     Args:
         sport: Sport to get schedule for.
         week: Week of the sport to get 
-            - NFL: 1 (September) - 18 (January) weeks for the season. 5 Playoff weeks after
+            - NFL: 1 (September) - 18 (January) weeks for the season. 5 Playoff weeks after (1-4 weeks)
+        type: Type of season (PRE, REG, PST)
+        year: Year of season (2024, 2025, etc.)
     '''
     try:
         sport_enum = SupportedSports(sport.lower())
-        data = mcp.config.get_data(sport_enum, f'/games/current_season/schedule.{mcp.config.format}')
-
+        data = mcp.config.get_data(sport_enum, f'/games/{year}/{type}/{week}/schedule.{mcp.config.format}')
         parsed_data = mcp.season_schedule.parse_schedule(data, sport_enum)
-        parsed_data = [week_val for week_val in parsed_data.get('weeks') if week_val.get('num') == week]
         return json.dumps(parsed_data, indent=2)
     except Exception as e:
         logger.error(f"Error getting schedule: {str(e)}")
@@ -357,7 +362,7 @@ async def get_season_schedule(week: Annotated[int, Field(description="Week sched
 async def get_daily_transactions(year: int, 
                                  month: int, 
                                  day: int, 
-                                 sport: Annotated[str, Field(description=f"Sport to get transactions for. Supported vals: {get_supported_sports_string()}")] = "nfl"):
+                                 sport: Annotated[str, Field(description=f"Sport to get transactions for. Supported vals: {get_supported_sports_string()}")] = "nfl") -> str:
     '''Gets info on transactions done in sports teams throughout the year. 
     Args:
         year: Year to get transactions for
@@ -374,8 +379,8 @@ async def get_daily_transactions(year: int,
         return f'Error getting transactions: {str(e)}'
 
 @mcp.tool()
-async def get_game_stats(game_id: str = None, 
-                         sport: Annotated[str, Field(description=f"Sport to get game stats for. Supported vals: {get_supported_sports_string()}")] = "nfl"):
+async def get_game_stats(game_id: str, 
+                         sport: Annotated[str, Field(description=f"Sport to get game stats for. Supported vals: {get_supported_sports_string()}")] = "nfl") -> str:
     '''Gets statistical info on a specific sports game using it's ID
     Args:
         game_id: ID for the game
@@ -391,7 +396,7 @@ async def get_game_stats(game_id: str = None,
         return f"Error getting stats: {str(e)}"
     
 @mcp.tool()
-async def get_league_info(sport: Annotated[str, Field(description=f"Sport to get league info for. Supported vals: {get_supported_sports_string()}")] = "nfl"):
+async def get_league_info(sport: Annotated[str, Field(description=f"Sport to get league info for. Supported vals: {get_supported_sports_string()}")] = "nfl") -> str:
     '''Gets top-level info about each team in the sport provided
     Args:
         sport: Sport to get league info for
@@ -407,7 +412,7 @@ async def get_league_info(sport: Annotated[str, Field(description=f"Sport to get
 
 @mcp.tool()
 async def get_team_roster(team_id: str = None, 
-                          sport: Annotated[str, Field(description=f"Sport to get league info for. Supported vals: {get_supported_sports_string()}")] = "nfl"):
+                          sport: Annotated[str, Field(description=f"Sport to get league info for. Supported vals: {get_supported_sports_string()}")] = "nfl") -> str:
     '''Gets franchise team info + complete roster of players in the sport provided
     Args:
         sport: Sport to get team roster for
@@ -424,7 +429,7 @@ async def get_team_roster(team_id: str = None,
     
 @mcp.tool()
 async def get_tournament_list(year: int, 
-                              sport: Annotated[str, Field(description=f"Sport to get league info for. Supported vals: {get_supported_sports_string()}")] = "nfl"):
+                              sport: Annotated[str, Field(description=f"Sport to get league info for. Supported vals: {get_supported_sports_string()}")] = "nfl") -> str:
     '''Gets lists of tournaments that are happening for the sport in that year
     Args:
         sport: Sport to get list of tournaments for
@@ -439,7 +444,7 @@ async def get_tournament_list(year: int,
         return f'Error getting tournament info: {str(e)}'
     
 async def get_tournament_info(tournament_id: str = None, 
-                              sport: Annotated[str, Field(description=f"Sport to get league info for. Supported vals: {get_supported_sports_string()}")] = "nfl"):
+                              sport: Annotated[str, Field(description=f"Sport to get league info for. Supported vals: {get_supported_sports_string()}")] = "nfl") -> str:
     '''Gets information of a tournament that is happening for the sport
     Args:
         tournament_id: id of the tournament
@@ -454,13 +459,29 @@ async def get_tournament_info(tournament_id: str = None,
         return f'Error getting tournament info: {str(e)}'
 
 @mcp.tool()
+async def get_player_stats(player_id: str,
+                           sport: Annotated[str, Field(description=f"Sport to get player info for. Supported vals: {get_supported_sports_string()}")] = "nfl") -> str:
+    '''Gets top-level info about each player in the sport provided
+    Args:
+        sport: Sport to get league info for
+        player_id: ID of the player that we are requesting info for
+    '''
+    try:
+        sport_enum = SupportedSports(sport.lower())
+        data = mcp.config.get_data(sport_enum, f'/players/{player_id}/profile.{mcp.config.format}')
+        parsed_data = mcp.player_stats.parse_stats(data, sport_enum)
+        return json.dumps(parsed_data, indent=2)
+    except Exception as e:
+        logger.error(f'Error getting league info: {str(e)}')
+        return f'Error getting league info: {str(e)}'
+
+@mcp.tool()
 async def get_address(lat: float, lon: float) -> str:
     '''When given coordinates (latitude and longitude), find the address
     '''
     geolocator = Nominatim(user_agent='sports-mcp-server')
     location = geolocator.reverse((lat, lon))
     return location.address
-
 
 '''
     MAIN SERVER CODE
