@@ -306,16 +306,15 @@ async def update_api_config(language: str | None = None,
 
 
 @mcp.tool()
-async def get_schedule(week: Annotated[int, Field(description="Week schedule for sport. 1 (NO 0 WEEK) (September) - 18 (January) weeks for the season. Playoff resets to 1-4 weeks.)")] = 0,
-                       type: Annotated[str, Field(description="Type of season, PRE (pre season), REG (regular season), PST (post season)")] = "REG",
+async def get_schedule(week: Annotated[int, Field(description="Week schedule for sport. PRE: weeks 1-3 (August), REG: weeks 1-18 (Sept-Jan), PST: weeks 1-4 (Jan-Feb). NO WEEK 0")] = 0,
+                       type: Annotated[str, Field(description="Type of season: PRE (pre season: August), REG (regular season: Sept-Jan), PST (post season: Jan-Feb)")] = "REG",
                        year: Annotated[int, Field(description="Year season starts (e.g. 2024 means 2024/25 season")] = 2024,
                        sport: Annotated[str, Field(description=f"Sport to get schedule for. Supported vals: {get_supported_sports_string()}")] = "nfl") -> str:
     '''Gets a week schedule for the sport given. 
     Args:
         sport: Sport to get schedule for.
-        week: Week of the sport to get 
-            - NFL: 1 (September) - 18 (January) weeks for the season. 5 Playoff weeks after (1-4 weeks)
-        type: Type of season (PRE, REG, PST)
+        week: Week schedule for sport. PRE: weeks 1-3 (August), REG: weeks 1-18 (Sept-Jan), PST: weeks 1-4 (Jan-Feb). NO WEEK 0
+        type: Type of season: PRE (pre season: August), REG (regular season: Sept-Jan), PST (post season: Jan-Feb)
         year: Year of season start (e.g. 2024 means 2024/25 season)
     '''
     try:

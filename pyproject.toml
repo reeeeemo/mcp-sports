@@ -1,6 +1,6 @@
 [project]
 name = "mcp-sports-server"
-version = "1.0.1"
+version = "1.0.3"
 description = "Model Context Protocol SDK for real-time sports stats. Requires an API key from SportsRadar"
 readme = "README.md"
 requires-python = ">=3.10"
