@@ -1,14 +1,12 @@
-import asyncio
 from calendar import month
 from dataclasses import dataclass
 from typing import Annotated, Literal
 import json
-import argparse
 from fastmcp import FastMCP
 import requests
 import logging
 from geopy.geocoders import Nominatim
-from sportsclasses import SportResource, SupportedSports, Sport, get_supported_sports_string, sports
+from .sportsclasses import SportResource, SupportedSports, Sport, get_supported_sports_string, sports
 from pydantic import Field
 import time
 
@@ -464,13 +462,4 @@ async def serve(api_key: str | None = None) -> None:
     # Run MCP Server
     mcp.api_key = api_key
     await mcp.run_stdio_async()
-    
-
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser( description='Provide accurate and up-to-date sports stats via SportRadar' ) 
-    parser.add_argument( '--api-key', type=str, required=True, help='API Key for SportRadar' )
-    
-    args = parser.parse_args()
-    
-    # Pass API key to our server func
-    asyncio.run(serve(args.api_key))
+   

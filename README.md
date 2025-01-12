@@ -106,7 +106,7 @@ Python server implementing Model Context Protocol (MCP) for interactability with
 ```json
 {
   "mcpServers": {
-     "ancestry": {
+     "sports": {
        "command": "mcp-sports-server",
        "args": ["--api-key", "your_api_key"]
      }
