@@ -1,11 +1,15 @@
 # Sports MCP Server
 [![MIT licensed][mit-badge]][mit-url]
 [![Python Version][python-badge]][python-url]
+[![PyPI version][pypi-badge]][pypi-url]
 
 [mit-badge]: https://img.shields.io/pypi/l/mcp.svg
 [mit-url]: https://github.com/reeeeemo/mcp-sports/blob/main/LICENSE
 [python-badge]: https://img.shields.io/pypi/pyversions/mcp.svg
 [python-url]: https://www.python.org/downloads/
+[pypi-badge]: https://badge.fury.io/py/mcp-sports-server.svg
+[pypi-url]: https://pypi.org/project/mcp-sports-server
+
 
 <strong>Built on top of the [Model Context Protocol Python SDK](https://modelcontextprotocol.io)</strong>
 
@@ -94,7 +98,7 @@ Python server implementing Model Context Protocol (MCP) for interactability with
 
 ### Installing Manually
 1. First, install the package:
-```pip install mcp-server-sports```
+```pip install mcp-sports-server```
 
 
 2. Add this to your `claude_desktop_config.json` 
@@ -103,7 +107,7 @@ Python server implementing Model Context Protocol (MCP) for interactability with
 {
   "mcpServers": {
      "ancestry": {
-       "command": "mcp-server-sports",
+       "command": "mcp-sports-server",
        "args": ["--api-key", "your_api_key"]
      }
   }
