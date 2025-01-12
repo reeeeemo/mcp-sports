@@ -54,7 +54,6 @@ class SportRadarConfig:
         logger.info(f'API_KEY: {params}')
         
         response = requests.get(final_url, params=params, headers=headers)
-        time.sleep(1) # no too many request errors
         logger.info(f'Response Status Code {response.status_code}')
         
         if not response.ok:
@@ -309,7 +308,7 @@ async def update_api_config(language: str | None = None,
 @mcp.tool()
 async def get_schedule(week: Annotated[int, Field(description="Week schedule for sport. 1 (NO 0 WEEK) (September) - 18 (January) weeks for the season. Playoff resets to 1-4 weeks.)")] = 0,
                        type: Annotated[str, Field(description="Type of season, PRE (pre season), REG (regular season), PST (post season)")] = "REG",
-                       year: Annotated[int, Field(description="Year of season")] = 2024,
+                       year: Annotated[int, Field(description="Year season starts (e.g. 2024 means 2024/25 season")] = 2024,
                        sport: Annotated[str, Field(description=f"Sport to get schedule for. Supported vals: {get_supported_sports_string()}")] = "nfl") -> str:
     '''Gets a week schedule for the sport given. 
     Args:
@@ -317,7 +316,7 @@ async def get_schedule(week: Annotated[int, Field(description="Week schedule for
         week: Week of the sport to get 
             - NFL: 1 (September) - 18 (January) weeks for the season. 5 Playoff weeks after (1-4 weeks)
         type: Type of season (PRE, REG, PST)
-        year: Year of season (2024, 2025, etc.)
+        year: Year of season start (e.g. 2024 means 2024/25 season)
     '''
     try:
         sport_enum = SupportedSports(sport.lower())
@@ -326,7 +325,7 @@ async def get_schedule(week: Annotated[int, Field(description="Week schedule for
         return json.dumps(parsed_data, indent=2)
     except Exception as e:
         logger.error(f"Error getting schedule: {str(e)}")
-        return f'Error getting schedule: {str(e)}'
+        return f'Error getting schedule: {str(e)}. Remember: 1-18 weeks REG. 1-4 weeks PST.'
 
 @mcp.tool()
 async def get_daily_transactions(year: int, 
@@ -363,7 +362,7 @@ async def get_game_stats(game_id: Annotated[str, Field(description="ID for the g
         return json.dumps(parsed_data, indent=2)
     except Exception as e:
         logger.error(f"Error getting stats: {str(e)}")
-        return f"Error getting stats: {str(e)}"
+        return f"Error getting stats: {str(e)}. Have you tried calling get_schedule first?"
     
 @mcp.tool()
 async def get_league_info(sport: Annotated[str, Field(description=f"Sport to get league info for. Supported vals: {get_supported_sports_string()}")] = "nfl") -> str:
@@ -395,7 +394,7 @@ async def get_team_roster(team_id: Annotated[str, Field(description="Team to get
         return json.dumps(parsed_data, indent=2)
     except Exception as e:
         logger.error(f'Error getting team info: {str(e)}')
-        return f'Error getting team info: {str(e)}'
+        return f'Error getting team info: {str(e)}. Have you tried calling get_league_info first?'
     
 @mcp.tool()
 async def get_tournament_list(year: int, 
@@ -426,7 +425,7 @@ async def get_tournament_info(tournament_id: Annotated[str, Field(description="I
         return json.dump(data, indent=2)
     except Exception as e:
         logger.error(f'Error getting tournament info: {str(e)}')
-        return f'Error getting tournament info: {str(e)}'
+        return f'Error getting tournament info: {str(e)}. Have you tried calling get_tournament_list first?'
 
 @mcp.tool()
 async def get_player_stats(player_id: Annotated[str, Field(description="ID of player for info. If unknown, get team roster")],
@@ -443,7 +442,7 @@ async def get_player_stats(player_id: Annotated[str, Field(description="ID of pl
         return json.dumps(parsed_data, indent=2)
     except Exception as e:
         logger.error(f'Error getting league info: {str(e)}')
-        return f'Error getting league info: {str(e)}'
+        return f'Error getting league info: {str(e)}. Have you tried calling get_team_roster first?'
 
 @mcp.tool()
 async def get_address(lat: float, lon: float) -> str:
